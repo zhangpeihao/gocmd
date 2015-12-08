@@ -176,7 +176,12 @@ func startHandler(w http.ResponseWriter, req *http.Request) {
 		w.Write([]byte(fmt.Sprintf("Run err: %s", err.Error())))
 		return
 	}
-	cmd.Wait()
+	err = cmd.Wait()
+	if err != nil {
+		w.WriteHeader(400)
+		w.Write([]byte(fmt.Sprintf("Wait err: %s", err.Error())))
+		return
+	}
 	w.WriteHeader(200)
 
 	n, err := io.Copy(w, stderr)
