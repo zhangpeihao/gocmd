@@ -3,12 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path"
+	"strings"
 	"syscall"
 )
 
@@ -68,32 +68,10 @@ func deployHandler(w http.ResponseWriter, req *http.Request) {
 		w.Write([]byte("Unknown module"))
 		return
 	}
+	fmt.Println(cmdString, mode)
 
 	cmd := exec.Command(cmdString, mode)
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		w.WriteHeader(400)
-		return
-	}
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		w.WriteHeader(400)
-		return
-	}
-	err = cmd.Start()
-	if err != nil {
-		w.WriteHeader(400)
-		w.Write([]byte(fmt.Sprintf("Run err: %s", err.Error())))
-		return
-	}
-	cmd.Wait()
-	w.WriteHeader(200)
-
-	n, err := io.Copy(w, stderr)
-	m, err := io.Copy(w, stdout)
-	if m+n == 0 {
-		w.Write([]byte("no response"))
-	}
+	response(w, cmd)
 }
 
 func setTagHandler(w http.ResponseWriter, req *http.Request) {
@@ -120,32 +98,10 @@ func setTagHandler(w http.ResponseWriter, req *http.Request) {
 		w.Write([]byte("Unknown module"))
 		return
 	}
+	fmt.Println(cmdString, mode)
 
 	cmd := exec.Command(cmdString, mode)
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		w.WriteHeader(400)
-		return
-	}
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		w.WriteHeader(400)
-		return
-	}
-	err = cmd.Start()
-	if err != nil {
-		w.WriteHeader(400)
-		w.Write([]byte(fmt.Sprintf("Run err: %s", err.Error())))
-		return
-	}
-	cmd.Wait()
-	w.WriteHeader(200)
-
-	n, err := io.Copy(w, stderr)
-	m, err := io.Copy(w, stdout)
-	if m+n == 0 {
-		w.Write([]byte("no response"))
-	}
+	response(w, cmd)
 }
 
 func startHandler(w http.ResponseWriter, req *http.Request) {
@@ -159,35 +115,30 @@ func startHandler(w http.ResponseWriter, req *http.Request) {
 
 	var cmdString string
 	cmdString = path.Join(*root, "docker", "jk-docker", "start.sh")
-	cmd := exec.Command(cmdString, mode)
-	stdout, err := cmd.StdoutPipe()
+	fmt.Println(cmdString, mode, module)
+
+	cmd := exec.Command(cmdString, mode, module)
+	response(w, cmd)
+}
+
+func response(w http.ResponseWriter, cmd *exec.Cmd) {
+	out, err := cmd.CombinedOutput()
 	if err != nil {
 		w.WriteHeader(400)
-		return
-	}
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		w.WriteHeader(400)
-		return
-	}
-	err = cmd.Start()
-	if err != nil {
-		w.WriteHeader(400)
-		w.Write([]byte(fmt.Sprintf("Run err: %s", err.Error())))
-		return
-	}
-	err = cmd.Wait()
-	if err != nil {
-		w.WriteHeader(400)
-		w.Write([]byte(fmt.Sprintf("Wait err: %s", err.Error())))
+		htmlOutput(w, fmt.Sprintf("Error: %s", err.Error()))
 		return
 	}
 	w.WriteHeader(200)
-
-	n, err := io.Copy(w, stderr)
-	m, err := io.Copy(w, stdout)
-	if m+n == 0 {
-		w.Write([]byte("no response"))
-	}
+	htmlOutput(w, string(out))
 }
 
+func htmlOutput(w http.ResponseWriter, str string) {
+	str = strings.Replace(str, "\n", "<BR/>", -1)
+	str = strings.Replace(str, "[44m", `<font color="blue">`, -1)
+	str = strings.Replace(str, "[32m", `<font color="green">`, -1)
+	str = strings.Replace(str, "[31m", `<font color="red">`, -1)
+	str = strings.Replace(str, "[0m", `</font>`, -1)
+	w.Write([]byte(`<html>`))
+	w.Write([]byte(str))
+	w.Write([]byte(`</html>`))
+}
