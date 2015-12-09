@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -132,12 +134,12 @@ func response(w http.ResponseWriter, cmd *exec.Cmd) {
 	htmlOutput(w, string(out))
 }
 
-func htmlOutput(w http.ResponseWriter, str string) {
-	str = strings.Replace(str, "\n", "<BR/>", -1)
+func htmlOutput(w io.Writer, str string) {
 	str = strings.Replace(str, "[44m", `<font color="blue">`, -1)
 	str = strings.Replace(str, "[32m", `<font color="green">`, -1)
 	str = strings.Replace(str, "[31m", `<font color="red">`, -1)
-	str = strings.Replace(str, "[0m", `</font>`, -1)
+	str = strings.Replace(str, "\n", "<BR/>", -1)
+	str = string(bytes.Replace([]byte(str), []byte{91, 27, 48, 109}, []byte("</font>"), -1))
 	w.Write([]byte(`<html>`))
 	w.Write([]byte(str))
 	w.Write([]byte(`</html>`))
