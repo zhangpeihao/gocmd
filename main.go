@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -10,6 +12,7 @@ import (
 	"path"
 	"strings"
 	"syscall"
+	"time"
 )
 
 const (
@@ -29,9 +32,12 @@ func main() {
 	}
 	flag.Parse()
 
-	http.HandleFunc("/deploy", deployHandler)
-	http.HandleFunc("/set_tag", setTagHandler)
-	http.HandleFunc("/start", startHandler)
+	http.HandleFunc("/", cmdHandler)
+
+	//	http.HandleFunc("/deploy", deployHandler)
+	//	http.HandleFunc("/set_tag", setTagHandler)
+	//	http.HandleFunc("/start", startHandler)
+	//	http.HandleFunc("/test", testHandler)
 	go http.ListenAndServe(*bindAddress, nil)
 	catchSignal()
 
@@ -44,80 +50,13 @@ func catchSignal() {
 	os.Exit(0)
 }
 
-func deployHandler(w http.ResponseWriter, req *http.Request) {
-	mode := req.FormValue("mode")
-	module := req.FormValue("module")
-	fmt.Printf("deploy(mode: %s, module: %s)\n", mode, module)
-	if len(mode) == 0 || len(module) == 0 {
-		w.WriteHeader(400)
-		return
-	}
+func cmdHandler(w http.ResponseWriter, req *http.Request) {
+	url := strings.Split(strings.Split(req.RequestURI, "/")[1], "?")[0]
+	params := strings.Split(req.FormValue("params"), ",")
 
-	var cmdString string
-	switch module {
-	case "tomcat":
-		cmdString = path.Join(*root, "java", "jk-mobile", "make.sh")
-	case "h5":
-		cmdString = path.Join(*root, "h5", "jk", "make.sh")
-	case "h5-admin":
-		cmdString = path.Join(*root, "h5", "jk-admin", "make.sh")
-	case "static":
-		cmdString = path.Join(*root, "h5", "static", "make.sh")
-	default:
-		w.WriteHeader(400)
-		w.Write([]byte("Unknown module"))
-		return
-	}
-	fmt.Println(cmdString, mode)
-
-	cmd := exec.Command(cmdString, mode)
-	response(w, cmd)
-}
-
-func setTagHandler(w http.ResponseWriter, req *http.Request) {
-	mode := req.FormValue("mode")
-	module := req.FormValue("module")
-	fmt.Printf("set_tag(mode: %s, module: %s)\n", mode, module)
-	if len(mode) == 0 || len(module) == 0 {
-		w.WriteHeader(400)
-		return
-	}
-
-	var cmdString string
-	switch module {
-	case "tomcat":
-		cmdString = path.Join(*root, "java", "jk-mobile", "set_tag.sh")
-	case "h5":
-		cmdString = path.Join(*root, "h5", "jk", "set_tag.sh")
-	case "h5-admin":
-		cmdString = path.Join(*root, "h5", "jk-admin", "set_tag.sh")
-	case "static":
-		cmdString = path.Join(*root, "h5", "static", "set_tag.sh")
-	default:
-		w.WriteHeader(400)
-		w.Write([]byte("Unknown module"))
-		return
-	}
-	fmt.Println(cmdString, mode)
-
-	cmd := exec.Command(cmdString, mode)
-	response(w, cmd)
-}
-
-func startHandler(w http.ResponseWriter, req *http.Request) {
-	mode := req.FormValue("mode")
-	module := req.FormValue("module")
-	fmt.Printf("start(mode: %s, module: %s)\n", mode, module)
-	if len(mode) == 0 || len(module) == 0 {
-		w.WriteHeader(400)
-		return
-	}
-
-	var cmdString string
-	cmdString = path.Join(*root, "docker", "jk-docker", "start.sh")
-	fmt.Println(cmdString, mode, module)
-
-	cmd := exec.Command(cmdString, mode, module)
+	fmt.Printf("%s: %s(%v)\n", time.Now().Format(time.RFC3339), url, params)
+	cmdString := path.Join(*root, url) + ".sh"
+	cmd := exec.Command(cmdString, params...)
 	response(w, cmd)
 }
 
@@ -132,13 +71,15 @@ func response(w http.ResponseWriter, cmd *exec.Cmd) {
 	htmlOutput(w, string(out))
 }
 
-func htmlOutput(w http.ResponseWriter, str string) {
-	str = strings.Replace(str, "\n", "<BR/>", -1)
-	str = strings.Replace(str, "[44m", `<font color="blue">`, -1)
-	str = strings.Replace(str, "[32m", `<font color="green">`, -1)
-	str = strings.Replace(str, "[31m", `<font color="red">`, -1)
-	str = strings.Replace(str, "[0m", `</font>`, -1)
+func htmlOutput(w io.Writer, str string) {
+	b := []byte(str)
+	b = bytes.Replace(b, []byte{27, 91, 48, 109}, []byte("</font>"), -1)
+	b = bytes.Replace(b, []byte{27, 91, 52, 52, 109}, []byte(`<font color="blue" size="5">`), -1)
+	b = bytes.Replace(b, []byte{27, 91, 51, 50, 109}, []byte(`<font color="green" size="6">`), -1)
+	b = bytes.Replace(b, []byte{27, 91, 51, 49, 109}, []byte(`<font color="red" size="6">`), -1)
+	b = bytes.Replace(b, []byte{10}, []byte(`<BR/>`), -1)
 	w.Write([]byte(`<html>`))
-	w.Write([]byte(str))
+	w.Write(b)
 	w.Write([]byte(`</html>`))
 }
+
