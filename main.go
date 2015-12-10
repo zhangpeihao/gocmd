@@ -107,6 +107,11 @@ func setTagHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func startHandler(w http.ResponseWriter, req *http.Request) {
+	defer func() {
+		if e := recover(); e != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	}()
 	mode := req.FormValue("mode")
 	module := req.FormValue("module")
 	fmt.Printf("start(mode: %s, module: %s)\n", mode, module)
