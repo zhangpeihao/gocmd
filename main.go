@@ -132,7 +132,10 @@ func response(w http.ResponseWriter, cmd *exec.Cmd) {
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		w.WriteHeader(400)
-		htmlOutput(w, fmt.Sprintf("Error: %s", err.Error()))
+		htmlOutput(w, fmt.Sprintf("<font color=\"red\">Error: %s</font><BR/>", err.Error()))
+		if out != nil {
+			htmlOutput(w, string(out))
+		}
 		return
 	}
 	w.WriteHeader(200)
