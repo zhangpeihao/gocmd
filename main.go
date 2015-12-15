@@ -64,8 +64,7 @@ func response(w http.ResponseWriter, cmd *exec.Cmd) {
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		w.WriteHeader(400)
-		htmlOutput(w, fmt.Sprintf("<font color=\"red\" size=\"6\">Error: %s</font><BR/>", err.Error()))
-		htmlOutput(w, string(out))
+		htmlOutput(w, fmt.Sprintf("<font color=\"red\" size=\"6\">Error: %s</font><BR/>", err.Error())+string(out))
 		return
 	}
 	w.WriteHeader(200)
