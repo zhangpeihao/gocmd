@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -17,12 +18,13 @@ import (
 
 const (
 	programName = "gocmd"
-	version     = "0.1"
+	version     = "0.2"
 )
 
 var (
 	bindAddress *string = flag.String("BindAddress", ":8001", "The bind address.")
 	root        *string = flag.String("Root", "/root/src", "The root path.")
+	jsonFormat  *bool   = flag.Bool("JSON", false, "JSON response")
 )
 
 func main() {
@@ -64,11 +66,19 @@ func response(w http.ResponseWriter, cmd *exec.Cmd) {
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		w.WriteHeader(400)
-		htmlOutput(w, fmt.Sprintf("<font color=\"red\" size=\"6\">Error: %s</font><BR/>", err.Error())+string(out))
+		if *jsonFormat {
+			jsonOutput(w, err.Error()+string(out))
+		} else {
+			htmlOutput(w, fmt.Sprintf("<font color=\"red\" size=\"6\">Error: %s</font><BR/>", err.Error())+string(out))
+		}
 		return
 	}
 	w.WriteHeader(200)
-	htmlOutput(w, string(out))
+	if *jsonFormat {
+		jsonOutput(w, string(out))
+	} else {
+		htmlOutput(w, string(out))
+	}
 }
 
 func htmlOutput(w io.Writer, str string) {
@@ -81,4 +91,18 @@ func htmlOutput(w io.Writer, str string) {
 	w.Write([]byte(`<html>`))
 	w.Write(b)
 	w.Write([]byte(`</html>`))
+}
+
+type jsonResult struct {
+	Message string `json:"message"`
+}
+
+func jsonOutput(w io.Writer, str string) {
+	res := jsonResult{
+		Message: str,
+	}
+	dec := json.NewEncoder(w)
+	if err := dec.Encode(&res); err != nil {
+		fmt.Println("json encode error:", err.Error())
+	}
 }
